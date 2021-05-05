@@ -1,4 +1,4 @@
-#    Copyright (c) 2020 imagiscope
+#    Copyright (c) 2021 imagiscope
 
 #    Permission is hereby granted, free of charge, to any person obtaining a copy
 #    of this software and associated documentation files (the "Software"), to deal
@@ -928,7 +928,8 @@ def makemarkers():
                     if k2.type == 'FONT': # if a text object, set the text value to trackpoint name
                         k2.data.body = newtext
                     k2.parent = mk2
-                    k2.location = kid.location
+                    k2.location =kid.location 
+                    k2.rotation_euler = kid.rotation_euler
                     bpy.data.collections["GESMarkers"].objects.link(k2)
                 mkrcnt += 1
     ShowMessageBox( str(mkrcnt) + " Markers Created") 
