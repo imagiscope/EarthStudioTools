@@ -26,7 +26,7 @@ bl_info = {
     "author": "Rob Jolly - Imagiscope",
     "description": "Earth Studio Tools Addon",
     "blender": (2, 80, 0),
-    "version": (1, 0, 0),
+    "version": (1, 1, 0),
     "location": "View3D",
     "warning": "",
     "category": "Import-Export"
@@ -40,7 +40,7 @@ from xml.dom.minidom import Node
 from xml.etree import cElementTree as ElementTree
 
 
-
+ 
                 
 class GES_OT_Path(bpy.types.PropertyGroup):
     p_data: bpy.props.StringProperty(name="0000",subtype='FILE_PATH',default=r"")
@@ -51,11 +51,11 @@ class GES_OT_Path(bpy.types.PropertyGroup):
     p_expfolder: bpy.props.StringProperty(name="expdata",subtype='DIR_PATH',default=r"//")
     p_exp: bpy.props.StringProperty(name="expdata",subtype='FILE_NAME',default=r"ModifiedKML")
     
-    v_curve: bpy.props.EnumProperty(name="Curve",items=[('POLY',"Poly",""),('NURBS',"Nurbs","")])
+    v_curve: bpy.props.EnumProperty(name="Curve",items=[('NURBS',"Nurbs",""),('POLY',"Poly","")])
     
     def trackitems(self,context):
         t_trks = []
-        objects = bpy.context.scene.objects
+        objects = bpy.data.objects["_GES_WORLD"].children
         for obj in objects:
             if obj.type == "MESH":
                 if  obj.data.name[0:5] == "Plane":
@@ -89,7 +89,27 @@ class GES_OT_Path(bpy.types.PropertyGroup):
         
     v_xcolor: bpy.props.FloatVectorProperty(name="Line/Fill Color", subtype='COLOR', default=[0.0,1.0,0.0])
     
-    #reduce KML points based on closeness - default 10 (1 is closer (less reduction), 100 further away (more reduction))"
+    def nontrackitems(self,context):
+        t_trks = []
+        objects = bpy.context.scene.objects
+        for obj in objects:
+            nonges = False # Only display root obects - no cameras, no lights, no GES items
+            if (obj.parent) == None:
+                nonges = True
+            if (obj.type) == 'LIGHT' or (obj.type) == 'CAMERA':
+                nonges = False
+            if obj.name[0:5] != "_GES_" and nonges == True and obj.name[0:7] != "Marker_" :
+                t_trks.append(( obj.name, obj.name,""))
+            
+        return t_trks
+    v_mtemplate: bpy.props.EnumProperty(
+        name = "Template",
+        description = "Marker Template",
+        items =  nontrackitems 
+    )
+    v_mlookat: bpy.props.BoolProperty(name="Face to Camera",description="Align the Marker to the Camera.", default = True) 
+
+    
 # Earth Studio import panel
 class GES_PT_ImportPanel(bpy.types.Panel):
     bl_label = "Earth Studio Import"
@@ -216,6 +236,59 @@ class GES_PT_SubKML(bpy.types.Panel):
             row.label(text="Import KML first", icon="LOCKED")
         #row = layout.row()
         
+# Marker Panel
+class GES_PT_MarkerPanel(bpy.types.Panel):
+    bl_label = "Trackpoint Marker Tool"
+    bl_idname = "GES_PT_MarkerPanel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'Earth Studio'
+    bl_options = {'DEFAULT_CLOSED'}
+    
+    def draw(self,context):
+        objects = bpy.context.scene.objects
+        hasGES = 0
+        for obj in objects:
+           
+            if obj.name == "_GES_WORLD":
+                hasGES=1
+           
+                    
+        if hasGES == 1: # enabled
+           
+            context.area.tag_redraw()
+            layout = self.layout
+            row = layout.row()
+            row.label(text="Add Marker for each Trackpoint")
+            row = layout.row()
+            row.label(text="1. Create Template Marker")
+            row = layout.row()
+            row.label(text="   - Parent all objects to object/empty")
+            row = layout.row()
+            row.label(text="   - Text Object will use Trackpoint name")
+            row = layout.row()
+            row.label(text="   - Origin of Parent is rotation point")
+            row = layout.row()
+            row.label(text="2. Select Template Marker")
+            row = layout.row()
+            row.label(text="3. Use 'Face..' to always point to Camera")
+            row = layout.row()
+            row.prop(bpy.context.scene.GES_OT_Path, "v_mtemplate")
+            
+            row = layout.row()
+            row.prop(bpy.context.scene.GES_OT_Path, "v_mlookat")
+           
+            row = layout.row()
+            
+           
+            row.operator("scene.pre_marker", text="Create Markers" )
+               
+           
+        if hasGES == 0: # 'disable' section if there is no imported project
+            layout = self.layout
+            row = layout.row()
+            row.label(text="Import Earth Studio first", icon="LOCKED")
+            row = layout.row()
             
 # Help Panel
 class GES_PT_InfoPanel(bpy.types.Panel):
@@ -269,31 +342,43 @@ class preGES(bpy.types.Operator):
         fb  = bpy.context.scene.GES_OT_Path.p_data
         if fa != '' and fb != '':
             importges()
-            t_trks = []
             objects = bpy.context.scene.objects
+            hasGES = 0
             for obj in objects:
-                if obj.type == "MESH":
-                    if  obj.data.name[0:5] == "Plane":
-                        t_trks.append(( obj.name, obj.name,""))
-            v_snapto = bpy.props.EnumProperty(
-                 name = "Snap to",description = "Snap to TrackPoint in _GES_WORLD",items = t_trks  )
+                if obj.name == "_GES_WORLD":
+                    hasGES=1
+            if hasGES == 1:  
+                t_trks = []
+                objects = bpy.data.objects["_GES_WORLD"].children
+                for obj in objects:
+                    if obj.type == "MESH":
+                        if  obj.data.name[0:5] == "Plane":
+                            t_trks.append(( obj.name, obj.name,""))
+                v_snapto = bpy.props.EnumProperty(
+                     name = "Snap to",description = "Snap to TrackPoint in _GES_WORLD",items = t_trks  )
         return {'FINISHED'}
+
+# check files   
+class preMarker(bpy.types.Operator):
+    bl_idname = "scene.pre_marker"
+    bl_label = "GES PRE MARKER"
     
+           
+    def execute(self, context):
+        makemarkers()
+        return {'FINISHED'}
+        
+# Info Popup
+def ShowMessageBox(message = "", title = "Information", icon = 'INFO'):
+    def draw(self, context):
+        self.layout.label(text = message)
+    bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+          
 def importges():
     cam = bpy.context.scene.camera
 
     scene = bpy.context.scene
-    # load the GES render files as background for camera
-    # Sample format: ifiles = "D:/Local/Project/Beach/beach/footage/beach_0000.jpeg"
-    ifiles = bpy.path.abspath(bpy.context.scene.GES_OT_Path.p_movie)
-
-    img = bpy.data.movieclips.load(ifiles)
-    cam.data.show_background_images = True
-    bg = cam.data.background_images.new()
-    bg.clip = img
-    bg.alpha = 1
-    bg.source = "MOVIE_CLIP"
- 
+    
     # load JSON file for evaluation
     # Sample format: jfilename = "D:/Local/Project/Beach/beach/beach.json"
     jfilename = bpy.path.abspath(bpy.context.scene.GES_OT_Path.p_data)
@@ -301,138 +386,166 @@ def importges():
     jfile = open(jfilename,'r')
     camdata = json.load(jfile)
     jfile.close
+    hasTrack = 0
+    for cd in camdata:
+        if cd == "trackPoints":
+            hasTrack=1
+     # check trackpoints
+    if hasTrack == 0:
+        ShowMessageBox( "Ensure Earth Studio project has Trackpoints (min 1) and export JSON file with trackpoints.","Import Aborted - No Trackpoints Found","ERROR") 
+    else:
+        
+        # load the GES render files as background for camera
+        # Sample format: ifiles = "D:/Local/Project/Beach/beach/footage/beach_0000.jpeg"
+        ifiles = bpy.path.abspath(bpy.context.scene.GES_OT_Path.p_movie)
 
-    # evaluate number of frames
-    s_end = camdata["numFrames"]
+        img = bpy.data.movieclips.load(ifiles)
+        cam.data.show_background_images = True
+        bg = cam.data.background_images.new()
+        bg.clip = img
+        bg.alpha = 1
+        bg.source = "MOVIE_CLIP"
 
-    # set scene duration
-    scene.frame_start = 1
-    scene.frame_end = s_end 
-    scene.frame_set(1)
+        # evaluate number of frames
+        s_end = camdata["numFrames"]
 
-    # function for alignment scaling
-    def scale_from_vector(v):
-        mat = Matrix.Identity(4)
-        for i in range(3):
-            mat[i][i] = v[i]
-        return mat   
+        # set scene duration
+        scene.frame_start = 1
+        scene.frame_end = s_end 
+        scene.frame_set(1)
+
+        # function for alignment scaling
+        def scale_from_vector(v):
+            mat = Matrix.Identity(4)
+            for i in range(3):
+                mat[i][i] = v[i]
+            return mat   
+                
+        # set coords for positioning data starting at center of Blender global coordinates
+        psx = 0
+        psy = 0
+        psz = 0 
+
+        # load trackpoints
+        for f in range (0,len(camdata["trackPoints"])):
             
-    # set coords for positioning data starting at center of Blender global coordinates
-    psx = 0
-    psy = 0
-    psz = 0 
-
-    # load trackpoints
-    for f in range (0,len(camdata["trackPoints"])):
-        
-        px = camdata["trackPoints"][f]["position"]["x"]
-        py = camdata["trackPoints"][f]["position"]["y"]
-        pz = camdata["trackPoints"][f]["position"]["z"]
-        
-        rlat = camdata["trackPoints"][f]["coordinate"]["position"]["attributes"][0]["value"]["relative"]
-        rlng = camdata["trackPoints"][f]["coordinate"]["position"]["attributes"][1]["value"]["relative"]
-        
-        if f==0:
-            psx = px
-            psy = py
-            psz = pz
+            px = camdata["trackPoints"][f]["position"]["x"]
+            py = camdata["trackPoints"][f]["position"]["y"]
+            pz = camdata["trackPoints"][f]["position"]["z"]
             
-        rlat = 360 * (rlat) - 180
-        rlng = 180 * (rlng ) - 90
-        
-        bpy.ops.mesh.primitive_plane_add()
-        trk = bpy.context.selected_objects[0]
-        trk.name = str(f + 1) + ". " + camdata["trackPoints"][f]["name"]
-      
-        trk.location.x = (px-psx) / 100
-        trk.location.y = (py-psy) / 100
-        trk.location.z = (pz-psz) / 100
-        
-        trk.rotation_euler[1] = math.radians(90-rlng)
-        trk.rotation_euler[2] = math.radians(rlat)
-        trk.scale = (0.1,0.1,0.1)
-        
-        calt = camdata["trackPoints"][f]["coordinate"]["position"]["attributes"][2]["value"]["relative"]
-        trk['ALT'] = 65117481 * (calt) + 1 
-        
-        if f==0:
-            # create parent object - parent used to align position on earth with Blender global coordinates
-            bpy.ops.object.empty_add(type='SINGLE_ARROW', location=(0,0,0))
-            ges_parent = bpy.context.selected_objects[0]
-            ges_parent.name = "_GES_WORLD"
+            rlat = camdata["trackPoints"][f]["coordinate"]["position"]["attributes"][0]["value"]["relative"]
+            rlng = camdata["trackPoints"][f]["coordinate"]["position"]["attributes"][1]["value"]["relative"]
             
-            # align parent perpendicular to first track point
-            loc_src, rot_src, scale_src = trk.matrix_world.decompose()
-            loc_dst, rot_dst, scale_dst = ges_parent.matrix_world.decompose()
-
-            axis = Vector((0.0, 0.0, 1.0))
-            z1 = rot_src @ axis
-            z2 = rot_dst @ axis
-            q = z2.rotation_difference(z1)
-
-            ges_parent.matrix_world = (
-                Matrix.Translation(loc_dst) @
-                (q @ rot_dst).to_matrix().to_4x4() @
-                scale_from_vector(scale_dst)
-            )
+            if f==0:
+                psx = px
+                psy = py
+                psz = pz
+                
+            rlat = 360 * (rlat) - 180
+            rlng = 180 * (rlng ) - 90
             
-            # change x,y to negative values of x,y
-            ges_parent.rotation_euler[0] = -ges_parent.rotation_euler[0]
-            ges_parent.rotation_euler[1] = -ges_parent.rotation_euler[1]
-                  
-        # move trackpoint to GES parent
-        trk.parent = ges_parent
-     
-
-    # Camera Information
-    cam.delta_rotation_euler.y = 180 * math.pi / 180
-
-    for f in range (0,s_end + 1):
-        px = camdata["cameraFrames"][f]["position"]["x"] 
-        py = camdata["cameraFrames"][f]["position"]["y"] 
-        pz = camdata["cameraFrames"][f]["position"]["z"] 
-       
+            bpy.ops.mesh.primitive_plane_add()
+            trk = bpy.context.selected_objects[0]
+            trk.name = str(f + 1) + ". " + camdata["trackPoints"][f]["name"]
+          
+            trk.location.x = (px-psx) / 100
+            trk.location.y = (py-psy) / 100
+            trk.location.z = (pz-psz) / 100
             
-        rx = float(camdata["cameraFrames"][f]["rotation"]["x"])
-        ry = camdata["cameraFrames"][f]["rotation"]["y"] 
-        rz = camdata["cameraFrames"][f]["rotation"]["z"]
-        
-        # position set in relation to first frame - scale to 1/100
-        cam.location.x = (px-psx) / 100
-        cam.location.y = (py-psy) / 100
-        cam.location.z = (pz-psz) / 100
-     
-        eul = mathutils.Euler((0.0, 0.0, 0.0), 'XYZ')
-        
-        eul.rotate_axis('X', math.radians(-rx))
-        eul.rotate_axis('Y', math.radians(ry ))
-        eul.rotate_axis('Z', math.radians(-rz+180))
-        
-        cam.rotation_euler = eul
-      
-        cam.keyframe_insert(data_path="location", index=-1, frame=f + 1)
-        cam.keyframe_insert(data_path="rotation_euler", index=-1, frame=f + 1)
-        
-        
-    # camera "lens" based on 20 degree Filed of View (default value)
-    cam.data.sensor_width = 35 
-    cam.data.type = 'PERSP'
-    cam.data.lens_unit = 'FOV'
-    cam.data.angle = math.radians(34.8)
+            trk.rotation_euler[1] = math.radians(90-rlng)
+            trk.rotation_euler[2] = math.radians(rlat)
+            trk.scale = (0.1,0.1,0.1)
+            
+            calt = camdata["trackPoints"][f]["coordinate"]["position"]["attributes"][2]["value"]["relative"]
+            trk['ALT'] = 65117481 * (calt) + 1 
+            
+            if f==0:
+                # create parent object - parent used to align position on earth with Blender global coordinates
+                bpy.ops.object.empty_add(type='SINGLE_ARROW', location=(0,0,0))
+                ges_parent = bpy.context.selected_objects[0]
+                ges_parent.name = "_GES_WORLD"
+                
+                # align parent perpendicular to first track point
+                loc_src, rot_src, scale_src = trk.matrix_world.decompose()
+                loc_dst, rot_dst, scale_dst = ges_parent.matrix_world.decompose()
 
-    # move camera to GES parent
-    cam.parent = ges_parent
+                axis = Vector((0.0, 0.0, 1.0))
+                z1 = rot_src @ axis
+                z2 = rot_dst @ axis
+                q = z2.rotation_difference(z1)
 
-    bpy.context.scene.frame_current = 1   
-    area = next(area for area in bpy.context.screen.areas if area.type == 'VIEW_3D')
-    area.spaces[0].region_3d.view_perspective = 'CAMERA'
+                ges_parent.matrix_world = (
+                    Matrix.Translation(loc_dst) @
+                    (q @ rot_dst).to_matrix().to_4x4() @
+                    scale_from_vector(scale_dst)
+                )
+                
+                # change x,y to negative values of x,y
+                ges_parent.rotation_euler[0] = -ges_parent.rotation_euler[0]
+                ges_parent.rotation_euler[1] = -ges_parent.rotation_euler[1]
+                      
+            # move trackpoint to GES parent
+            trk.parent = ges_parent
+         
+
+        # Camera Information
+        cam.delta_rotation_euler.y = 180 * math.pi / 180
+
+        for f in range (0,s_end + 1):
+            px = camdata["cameraFrames"][f]["position"]["x"] 
+            py = camdata["cameraFrames"][f]["position"]["y"] 
+            pz = camdata["cameraFrames"][f]["position"]["z"] 
+           
+                
+            rx = float(camdata["cameraFrames"][f]["rotation"]["x"])
+            ry = camdata["cameraFrames"][f]["rotation"]["y"] 
+            rz = camdata["cameraFrames"][f]["rotation"]["z"]
+            
+            # position set in relation to first frame - scale to 1/100
+            cam.location.x = (px-psx) / 100
+            cam.location.y = (py-psy) / 100
+            cam.location.z = (pz-psz) / 100
+         
+            eul = mathutils.Euler((0.0, 0.0, 0.0), 'XYZ')
+            
+            eul.rotate_axis('X', math.radians(-rx))
+            eul.rotate_axis('Y', math.radians(ry ))
+            eul.rotate_axis('Z', math.radians(-rz+180))
+            
+            cam.rotation_euler = eul
+          
+            cam.keyframe_insert(data_path="location", index=-1, frame=f + 1)
+            cam.keyframe_insert(data_path="rotation_euler", index=-1, frame=f + 1)
+            
+            
+        # camera "lens" based on 20 degree Filed of View (default value)
+        cam.data.sensor_width = 35 
+        cam.data.type = 'PERSP'
+        cam.data.lens_unit = 'FOV'
+        cam.data.angle = math.radians(34.8)
+
+        # move camera to GES parent
+        cam.parent = ges_parent
+
+        bpy.context.scene.frame_current = 1   
+        area = next(area for area in bpy.context.screen.areas if area.type == 'VIEW_3D')
+        area.spaces[0].region_3d.view_perspective = 'CAMERA'
 
 def importkml():
     earth = 6371010.1 #earth radius, in meters
     add_elev = float(bpy.context.scene.GES_OT_Path.v_elevation)
     sn = bpy.data.objects[bpy.context.scene.GES_OT_Path.v_snapto]
+    
     tralt = sn["ALT"]
     
+    objects = bpy.data.objects["_GES_WORLD"].children
+    v_zerotrack = "" #initial center plane
+    for obj in objects:
+        if obj.type == "MESH":
+            if  obj.data.name[0:5] == "Plane":
+                if v_zerotrack == "":
+                    v_zerotrack = obj.name
+                    
     # function for alignment scaling
     def scale_from_vector(v):
         mat = Matrix.Identity(4)
@@ -471,6 +584,9 @@ def importkml():
         for i in range (0,coor.length ):
             if coor[i].parentNode.nodeName != "Point":
                 pl = coor[0].firstChild.nodeValue.strip()
+                pl = pl.replace("\n","")
+                while pl.find("  ") != -1:
+                    pl = pl.replace ("  "," ")
                 print ("coord found")
     if coor.length == 0 or pl == "": # try gx:coord method
         gxcoor = domData.getElementsByTagName("gx:coord")
@@ -483,6 +599,8 @@ def importkml():
             print (pl)
         elif gxcoor.length == 0:
             return
+    print (pl)
+    
     pt = pl.split(' ')
     #if add_elev != 0:
     if str(bpy.context.scene.GES_OT_Path.v_terrain) != 'True': # replace anchor value with trackpoint alt
@@ -608,8 +726,9 @@ def importkml():
     
     
     # align path to surface of the globe 
-    obj.rotation_euler[1] = math.radians(90-flng)
-    obj.rotation_euler[2] = math.radians(flat)
+    print (v_zerotrack)
+    obj.rotation_euler[1] = bpy.data.objects[v_zerotrack].rotation_euler[1] #math.radians(90-flng)
+    obj.rotation_euler[2] = bpy.data.objects[v_zerotrack].rotation_euler[2] #math.radians(flat)
 
 
     bpy.data.collections['Collection'].objects.link(obj)
@@ -654,8 +773,6 @@ def importkml():
     # add object to parent
     obj.parent = ges_path
     obj.parent_type = 'OBJECT'
-
-
     
     obj.data.bevel_depth = bpy.context.scene.GES_OT_Path.v_bevel
    
@@ -768,7 +885,54 @@ def newkml():
     fileObject.write(headertext + "\n" + xmlText.decode('utf8') + "</kml>") 
     fileObject.close()
 
+def makemarkers():
+    mkrcnt = 0 # Counter for information
 
+    # Load template objects
+    mk = bpy.data.objects[bpy.context.scene.GES_OT_Path.v_mtemplate]
+    
+    # Create new collection
+    if "GESMarkers" not in bpy.data.collections:
+        collection = bpy.data.collections.new("GESMarkers")
+        bpy.context.scene.collection.children.link(collection)
+        
+    # Cycle through GES trackpoints (except hidden ones)
+    objects = bpy.data.objects["_GES_WORLD"].children 
+
+    for obj in objects:
+        if obj.type == "MESH":
+            if  obj.data.name[0:5] == "Plane" and obj.visible_get():
+                # Trackpoint name and clean up
+                newtext = obj.name
+                spx = newtext.split(' ')[0].replace(".","")
+                if spx.isdecimal():
+                    newtext = newtext.replace(spx + ". ","")
+                # Create copy of marker and text
+                mk2 = bpy.data.objects.new('Marker_' + newtext, mk.data.copy())
+                # Set parenting, location, scale and rotation
+                mk2.location = obj.matrix_world.translation
+                mk2.scale = mk.scale
+                mk2.rotation_euler = mk.rotation_euler
+                # Add track to camera
+                if str(bpy.context.scene.GES_OT_Path.v_terrain) == "True":
+                    constraint = mk2.constraints.new(type='TRACK_TO')
+                    constraint.target = bpy.data.objects['Camera']
+                    constraint.track_axis="TRACK_Z"
+                # Move (link) to Collection
+                bpy.data.collections["GESMarkers"].objects.link(mk2)
+                # Clone children (really, we're doing that)
+                kids = mk.children
+                for kid in kids:
+                    
+                    k2 = bpy.data.objects.new( kid.name + '_' + newtext, kid.data.copy())
+                    if k2.type == 'FONT': # if a text object, set the text value to trackpoint name
+                        k2.data.body = newtext
+                    k2.parent = mk2
+                    k2.location = kid.location
+                    bpy.data.collections["GESMarkers"].objects.link(k2)
+                mkrcnt += 1
+    ShowMessageBox( str(mkrcnt) + " Markers Created") 
+    
 def rgb_to_hex(color):
 
     strip_n_pad = lambda stp: str(stp[2:]).zfill(2) 
@@ -809,10 +973,12 @@ def register():
     bpy.utils.register_class(GES_PT_ImportPanel)
     bpy.utils.register_class(GES_PT_KMLPanel)
     bpy.utils.register_class(GES_PT_SubKML)
+    bpy.utils.register_class(GES_PT_MarkerPanel)
     bpy.utils.register_class(GES_PT_InfoPanel)
     bpy.utils.register_class(GES_OT_Path)
     bpy.utils.register_class(preKML)
     bpy.utils.register_class(preGES)
+    bpy.utils.register_class(preMarker)
     bpy.utils.register_class(isvoid)
     
     bpy.types.Scene.GES_OT_Path = bpy.props.PointerProperty(type=GES_OT_Path)
@@ -821,10 +987,12 @@ def unregister():
     bpy.utils.unregister_class(GES_PT_ImportPanel)
     bpy.utils.unregister_class(GES_PT_KMLPanel)
     bpy.utils.unregister_class(GES_PT_SubKML)
+    bpy.utils.unregister_class(GES_PT_MarkerPanel)
     bpy.utils.unregister_class(GES_PT_InfoPanel)
     bpy.utils.unregister_class(GES_OT_Path)
     bpy.utils.unregister_class(preKML)
     bpy.utils.unregister_class(preGES)
+    bpy.utils.unregister_class(preMarker)
     bpy.utils.unregister_class(isvoid)
     
 if __name__ == "__main__":
