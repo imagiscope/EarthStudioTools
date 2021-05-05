@@ -914,7 +914,7 @@ def makemarkers():
                 mk2.scale = mk.scale
                 mk2.rotation_euler = mk.rotation_euler
                 # Add track to camera
-                if str(bpy.context.scene.GES_OT_Path.v_terrain) == "True":
+                if str(bpy.context.scene.GES_OT_Path.v_mlookat) == "True":
                     constraint = mk2.constraints.new(type='TRACK_TO')
                     constraint.target = bpy.data.objects['Camera']
                     constraint.track_axis="TRACK_Z"
