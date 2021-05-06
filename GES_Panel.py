@@ -787,8 +787,28 @@ def newkml():
     xfilename = bpy.path.abspath(bpy.context.scene.GES_OT_Path.p_kml)
     domData = parse(xfilename)
     coor = domData.getElementsByTagName("coordinates")
-    pl = coor[0].firstChild.nodeValue.strip()
     
+    pl = ""
+    if coor.length != 0:
+        for i in range (0,coor.length ):
+            if coor[i].parentNode.nodeName != "Point":
+                pl = coor[0].firstChild.nodeValue.strip()
+                pl = pl.replace("\n","")
+                while pl.find("  ") != -1:
+                    pl = pl.replace ("  "," ")
+                print ("coord found")
+    if coor.length == 0 or pl == "": # try gx:coord method
+        gxcoor = domData.getElementsByTagName("gx:coord")
+        print ("xx")
+        if gxcoor.length != 0:
+            for i in range (0,gxcoor.length): #format like coordinates
+                if i != 0:
+                    pl+= " "
+                pl +=  str(gxcoor[i].firstChild.nodeValue.strip()).replace(" ",",")
+            print (pl)
+        elif gxcoor.length == 0:
+            return
+        
     # get coordinates
     co = ""
     pt = pl.split(' ')
