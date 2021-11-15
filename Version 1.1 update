@@ -1,6 +1,0 @@
-Updates/Fixes:
-
-NEW Trackpoint Marker Tool to generate Markers for Points of Interest based on a template you design (text will use name of trackpoint)
-Update to KML importer - will now import KML files from Google My Maps
-Improved messaging - alert on common error: when no trackpoints are in the JSON file, import will abort and message will be displayed to correct the issue (add trackpoint and export JSON file from GES).
-Improvements for multiple KML files (fixes alignment issues)
