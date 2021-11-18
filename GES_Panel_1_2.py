@@ -26,7 +26,7 @@ bl_info = {
     "author": "Rob Jolly - Imagiscope",
     "description": "Earth Studio Tools Addon",
     "blender": (2, 80, 0),
-    "version": (1, 2, 0),
+    "version": (1, 2, 1),
     "location": "View3D",
     "warning": "",
     "category": "Import-Export"
@@ -857,8 +857,6 @@ def makemarkers():
                 spx = newtext.split(' ')[0].replace(".","")
                 if spx.isdecimal():
                     newtext = newtext.replace(spx + ". ","")
-                # create collection for marker (for easier hiding)  
-                #marker_collection = bpy.data.collections.new('Marker_' + newtext)
                 if mk.type == "EMPTY":
                     # Create new empth
                     mk2 = bpy.data.objects.new('Marker_' + newtext, None)
@@ -876,22 +874,19 @@ def makemarkers():
                     constraint.target = bpy.data.objects['Camera']
                     constraint.track_axis="TRACK_Z"
                 # Move (link) to Collection
-                #marker_collection.objects.link(mk2)
+                bpy.data.collections["GESMarkers"].objects.link(mk2)
                 # Clone children (really, we're doing that)
                 kids = mk.children              
                 for kid in kids:
-                    
+                   
                     k2 = bpy.data.objects.new( kid.name + '_' + newtext, kid.data.copy())
                     k2.matrix_local = kid.matrix_local
                     if k2.type == 'FONT': # if a text object, set the text value to trackpoint name
                         k2.data.body = newtext
                     k2.parent = mk2  
-                    # Move (link) object to marker collection 
-                    #marker_collection.objects.link(k2)
-                    mk2.objects.link(k2)
-                # Move (link) all into main collection   
-                #bpy.data.collections["GESMarkers"].children.link(marker_collection)
-                bpy.data.collections["GESMarkers"].children.link(mk2)
+                   
+                    bpy.data.collections["GESMarkers"].objects.link(k2)
+             
                 mkrcnt += 1
     ShowMessageBox( str(mkrcnt) + " Markers Created") 
 
