@@ -26,7 +26,7 @@ bl_info = {
     "author": "Rob Jolly - Imagiscope",
     "description": "Earth Studio Tools Addon",
     "blender": (2, 80, 0),
-    "version": (1, 2, 1),
+    "version": (1, 2, 2),
     "location": "View3D",
     "warning": "",
     "category": "Import-Export"
@@ -640,10 +640,10 @@ def importkml():
         for i in range (0,coor.length ):
             if coor[i].parentNode.nodeName != "Point":
                 pl = coor[0].firstChild.nodeValue.strip()
-                pl = pl.replace("\n","")
+                pl = pl.replace("\n","  ")
                 while pl.find("  ") != -1:
                     pl = pl.replace ("  "," ")
-                print ("coord found")
+                #print ("coord found")
     if coor.length == 0 or pl == "": # try gx:coord method
         gxcoor = domData.getElementsByTagName("gx:coord")
         print ("xx")
@@ -655,7 +655,7 @@ def importkml():
             print (pl)
         elif gxcoor.length == 0:
             return
-    print (pl)
+    #print (pl)
     
     pt = pl.split(' ')
     #if add_elev != 0:
