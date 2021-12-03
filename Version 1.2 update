@@ -1,4 +1,10 @@
-Vsrsion 1.2:
+Version 1.2.2:
+- Added code for new KML layout
+
+Version 1.2.1:
+- fixed Marker Maker code
+
+Version 1.2:
 - New 3D object to KML
 - Updated Marker Maker
 - various fixes and error control (for international users, deleting object, etc)
